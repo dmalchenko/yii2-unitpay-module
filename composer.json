@@ -1,0 +1,21 @@
+{
+    "name": "dmalchenko/yii2-unitpay-module",
+    "description": "Unitpay module for yii2",
+    "type": "yii2-extension",
+    "keywords": ["yii2","extension","unitpay","unit pay"],
+    "license": "BSD-3-Clause",
+    "authors": [
+        {
+            "name": "Dmitriy Malchenko",
+            "email": "malchenko.dmotriy.by@gmail.com"
+        }
+    ],
+    "require": {
+        "yiisoft/yii2": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "dmalchenko\\unitpay\\": "src"
+        }
+    }
+}
