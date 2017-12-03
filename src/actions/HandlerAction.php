@@ -2,63 +2,67 @@
 
 namespace dmalchenko\unitpay\actions;
 
+use yii\base\Actison;
 use dmalchenko\unitpay\models\UnitPay;
 use InvalidArgumentException;
-use yii\base\Action;
 
 class HandlerAction extends Action {
 
-	public function run()
-	{
-        // Project Data
-        $projectId  = 1;
-        $secretKey  = '9e977d0c0e1bc8f5cc9775a8cc8744f1';
+    public $secretKey = null;
 
-// My item Info
-        $itemName = 'Iphone 6 Skin Cover';
+    public $validateRequestFunction = null;
+    public $checkFunction = null;
+    public $payFunction = null;
+    public $errorFunction = null;
 
-// My Order Data
-        $orderId        = 'a183f94-1434-1e44';
-        $orderSum       = 900;
-        $orderDesc      = 'Payment for item "' . $itemName . '"';
-        $orderCurrency  = 'RUB';
+    public function run() {
+        $unitPay = new UnitPay($this->secretKey);
+        try {
+            $unitPay->checkHandlerRequest();
 
-        $unitPay = new UnitPay($secretKey);
-		try {
-			// Validate request (check ip address, signature and etc)
-			$unitPay->checkHandlerRequest();
+            list($method, $params) = [
+                \Yii::$app->request->get('method'),
+                \Yii::$app->request->get('params'),
+            ];
 
-			list($method, $params) = array($_GET['method'], $_GET['params']);
+            if (!is_callable($this->validateRequestFunction)) {
+                throw new InvalidArgumentException('validateRequestFunction is not callable');
+            }
 
-			// Very important! Validate request with your order data, before complete order
-			if (
-				$params['orderSum'] != $orderSum ||
-				$params['orderCurrency'] != $orderCurrency ||
-				$params['account'] != $orderId ||
-				$params['projectId'] != $projectId
-			) {
-				// logging data and throw exception
-				throw new InvalidArgumentException('Order validation Error!');
-			}
-			switch ($method) {
-				// Just check order (check server status, check order in DB and etc)
-				case 'check':
-					echo $unitPay->getSuccessHandlerResponse('Check Success. Ready to pay.');
-					break;
-				// Method Pay means that the money received
-				case 'pay':
-					// Please complete order
-					echo $unitPay->getSuccessHandlerResponse('Pay Success');
-					break;
-				// Method Error means that an error has occurred.
-				case 'error':
-					// Please log error text.
-					echo $unitPay->getSuccessHandlerResponse('Error logged');
-					break;
-			}
-// Oops! Something went wrong.
-		} catch (\Exception $e) {
-			echo $unitPay->getErrorHandlerResponse($e->getMessage());
-		}
-	}
+            if (call_user_func($this->validateRequestFunction, $params)) {
+                throw new InvalidArgumentException('Order validation Error!');
+            }
+
+            switch ($method) {
+                case 'check':
+                    $function = $this->checkFunction;
+                    $message = 'Check Success. Ready to pay.';
+                    break;
+                case 'pay':
+                    $function = $this->payFunction;
+                    $message = 'Pay Success';
+                    break;
+                case 'error':
+                    $function = $this->errorFunction;
+                    $message = 'Error logged';
+                    break;
+                default:
+                    throw new InvalidArgumentException("Method $method in not supported");
+                    break;
+            }
+            if (!is_callable($function)) {
+                throw new InvalidArgumentException("{$method}Function is not callable");
+            }
+
+            if (call_user_func($function, $params)) {
+                echo $unitPay->getSuccessHandlerResponse($message);
+            } else {
+                throw new InvalidArgumentException("{$method}Function returned false");
+            }
+        } catch (\Exception $e) {
+            echo $unitPay->getErrorHandlerResponse($e->getMessage());
+        } finally {
+            exit;
+        }
+    }
 }
